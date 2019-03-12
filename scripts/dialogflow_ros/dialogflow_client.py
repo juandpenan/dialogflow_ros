@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+# -*- coding: utf-8 -*-
 # Dialogflow
 import dialogflow_v2beta1
 from dialogflow_v2beta1.types import Context, EventInput, InputAudioConfig, \
@@ -80,7 +80,8 @@ class DialogflowClient(object):
                                         '/dialogflow_client/results')
         requests_topic = rospy.get_param('/dialogflow_client/requests_topic',
                                          '/dialogflow_client/requests')
-        text_req_topic = requests_topic + '/string_msg'
+        #text_req_topic = requests_topic + '/string_msg'
+        text_req_topic = requests_topic
         text_event_topic = requests_topic + '/string_event'
         msg_req_topic = requests_topic + '/df_msg'
         event_req_topic = requests_topic + '/df_event'

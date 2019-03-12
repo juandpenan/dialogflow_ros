@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import rospy
 from google.protobuf import struct_pb2
 from dialogflow_v2beta1.types import Context, EventInput, InputAudioConfig, \
@@ -113,9 +115,9 @@ def result_struct_to_msg(query_result):
         :rtype: DialogflowResult
         """
         df_result_msg = DialogflowResult()
-        df_result_msg.fulfillment_text = str(query_result.fulfillment_text)
-        df_result_msg.query_text = str(query_result.query_text)
-        df_result_msg.action = str(query_result.action)
+        df_result_msg.fulfillment_text = query_result.fulfillment_text.encode('utf-8')
+        df_result_msg.query_text = query_result.query_text.encode('utf-8')
+        df_result_msg.action = query_result.action.encode('utf-8')
         df_result_msg.parameters = parameters_struct_to_msg(
                 query_result.parameters
         )

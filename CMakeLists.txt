@@ -69,9 +69,9 @@ target_link_libraries(test_intent_event ${catkin_LIBRARIES} )
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-install(PROGRAMS
-  scripts/mic_client.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+install(DIRECTORY scripts/
+  USE_SOURCE_PERMISSIONS
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/
 )
 
 # Mark other files for installation (e.g. launch and bag files, etc.)
