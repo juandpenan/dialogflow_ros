@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 import rospy
+import rospkg
+
 from dialogflow_ros.srv import DialogflowService
 from dialogflow_ros import DialogflowClient
-
 
 class DialogflowService:
     def __init__(self):
