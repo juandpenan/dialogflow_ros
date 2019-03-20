@@ -7,6 +7,7 @@ from dialogflow_v2beta1.types import Context, EventInput, InputAudioConfig, \
     StreamingDetectIntentRequest, TextInput
 from dialogflow_v2beta1.gapic.enums import AudioEncoding, OutputAudioEncoding
 import google.api_core.exceptions
+from google.oauth2 import service_account
 import utils
 from AudioServerStream import AudioServerStream
 from MicrophoneStream import MicrophoneStream
@@ -22,6 +23,7 @@ from yaml import load, YAMLError
 import rospy
 import rospkg
 from std_msgs.msg import String
+from std_srvs.srv import Empty
 from dialogflow_ros.msg import *
 
 # Use to convert Struct messages to JSON
@@ -29,7 +31,7 @@ from dialogflow_ros.msg import *
 
 
 class DialogflowClient(object):
-    def __init__(self, language_code='en-US', last_contexts=None):
+    def __init__(self, last_contexts=None):
         """Initialize all params and load data"""
         """ Constants and params """
         self.CHUNK = 4096
@@ -39,6 +41,15 @@ class DialogflowClient(object):
         self.USE_AUDIO_SERVER = rospy.get_param('/dialogflow_client/use_audio_server', False)
         self.PLAY_AUDIO = rospy.get_param('/dialogflow_client/play_audio', True)
         self.DEBUG = rospy.get_param('/dialogflow_client/debug', False)
+
+        self._language_code = rospy.get_param('~default_language', 'en-US')
+
+        if not rospy.has_param('~google_application_credentials'):
+            rospy.logerr("Missing credentials file")
+            raise ValueError('Missing credentials file')
+
+        google_application_credentials = rospy.get_param('~google_application_credentials')
+        self.credentials = service_account.Credentials.from_service_account_file(google_application_credentials)
 
         # Register Ctrl-C sigint
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -57,7 +68,6 @@ class DialogflowClient(object):
         # Dialogflow params
         project_id = rospy.get_param('/dialogflow_client/project_id', 'my-project-id')
         session_id = str(uuid4())  # Random
-        self._language_code = language_code
         self.last_contexts = last_contexts if last_contexts else []
         # DF Audio Setup
         audio_encoding = AudioEncoding.AUDIO_ENCODING_LINEAR_16
@@ -71,26 +81,31 @@ class DialogflowClient(object):
                 audio_encoding=OutputAudioEncoding.OUTPUT_AUDIO_ENCODING_LINEAR_16
         )
         # Create a session
-        self._session_cli = dialogflow_v2beta1.SessionsClient()
+        self._session_cli = dialogflow_v2beta1.SessionsClient(credentials=self.credentials)
         self._session = self._session_cli.session_path(project_id, session_id)
         rospy.logdebug("DF_CLIENT: Session Path: {}".format(self._session))
 
+        self._responses = []
         """ ROS Setup """
         results_topic = rospy.get_param('/dialogflow_client/results_topic',
                                         '/dialogflow_client/results')
         requests_topic = rospy.get_param('/dialogflow_client/requests_topic',
                                          '/dialogflow_client/requests')
-        #text_req_topic = requests_topic + '/string_msg'
-        text_req_topic = requests_topic
-        text_event_topic = requests_topic + '/string_event'
-        msg_req_topic = requests_topic + '/df_msg'
-        event_req_topic = requests_topic + '/df_event'
+
+        # Suppressed for simplicity
+        #text_event_topic = requests_topic + '/string_event'
+        #msg_req_topic = requests_topic + '/df_msg'
+        #event_req_topic = requests_topic + '/df_event'
+        #rospy.Subscriber(text_event_topic, String, self._text_event_cb)
+        #rospy.Subscriber(msg_req_topic, DialogflowRequest, self._msg_request_cb)
+        #rospy.Subscriber(event_req_topic, DialogflowEvent, self._event_request_cb)
+
         self._results_pub = rospy.Publisher(results_topic, DialogflowResult,
                                             queue_size=10)
+        text_req_topic = requests_topic + '/string_msg'
         rospy.Subscriber(text_req_topic, String, self._text_request_cb)
-        rospy.Subscriber(text_event_topic, String, self._text_event_cb)
-        rospy.Subscriber(msg_req_topic, DialogflowRequest, self._msg_request_cb)
-        rospy.Subscriber(event_req_topic, DialogflowEvent, self._event_request_cb)
+        start_srv_ = rospy.Service('/dialogflow_client/start', Empty, self.start_dialog_cb)
+        state_srv_ = rospy.Service('/dialogflow_client/stop', Empty, self.stop_dialog_cb)
 
         """ Audio setup """
         # Mic stream input setup
@@ -104,6 +119,7 @@ class DialogflowClient(object):
 
         rospy.logdebug("DF_CLIENT: Last Contexts: {}".format(self.last_contexts))
         rospy.loginfo("DF_CLIENT: Ready!")
+
 
     # ========================================= #
     #           ROS Utility Functions           #
@@ -137,6 +153,14 @@ class DialogflowClient(object):
         new_event = EventInput(name=msg.data, language_code=self._language_code)
         self.event_intent(new_event)
 
+    def start_dialog_cb(self,req):
+        rospy.loginfo("[dialogflow_client] Start cb")
+        self.detect_intent_stream()
+        return []
+
+    def stop_dialog_cb(self,req):
+        self._responses.cancel()
+        return []
     # ================================== #
     #           Setters/Getters          #
     # ================================== #
@@ -261,14 +285,14 @@ class DialogflowClient(object):
 
         # Generator yields audio chunks.
         requests = self._generator()
-        responses = self._session_cli.streaming_detect_intent(requests)
-        resp_list = []
         try:
-            for response in responses:
+            self._responses = self._session_cli.streaming_detect_intent(requests)
+            resp_list = []
+            for response in self._responses:
                 resp_list.append(response)
                 rospy.logdebug(
                         'DF_CLIENT: Intermediate transcript: "{}".'.format(
-                                response.recognition_result.transcript))
+                                response.recognition_result.transcript.encode('utf-8')))
         except google.api_core.exceptions.Cancelled as c:
             rospy.logwarn("DF_CLIENT: Caught a Google API Client cancelled "
                           "exception. Check request format!:\n{}".format(c))
@@ -277,6 +301,8 @@ class DialogflowClient(object):
         except google.api_core.exceptions.ServiceUnavailable:
             rospy.logwarn("DF_CLIENT: Deadline exceeded exception caught. The response "
                           "took too long or you aren't connected to the internet!")
+        except Exception as e:
+            rospy.logwarn("DF_CLIENT: Unexpected exception: {}".format(e))
         else:
             if response is None:
                 rospy.logwarn("DF_CLIENT: No response received!")
@@ -298,6 +324,7 @@ class DialogflowClient(object):
             # Pub
             self._results_pub.publish(df_msg)
             if return_result: return df_msg, final_result
+            self._responses = []
             return df_msg
 
     def event_intent(self, event):
@@ -344,4 +371,3 @@ if __name__ == '__main__':
     rospy.init_node('dialogflow_client')
     df = DialogflowClient()
     df.start()
-    # df.detect_intent_stream()
