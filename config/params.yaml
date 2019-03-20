@@ -1,8 +1,10 @@
 results_topic: "/dialogflow_client/results"
-requests_topic: "/pepper_perception/hri_comm"
+requests_topic: "/dialogflow_client/requests/"
+start_srv: "/dialogflow_client/start"
 project_id: "acciona-pepper"
 play_audio: false
 use_audio_server: false
 server_name: "127.0.0.1"
 port: 4444
 debug: false
+default_language: "es-ES"
