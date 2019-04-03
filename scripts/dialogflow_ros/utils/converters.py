@@ -7,7 +7,7 @@ from dialogflow_v2beta1.types import Context, EventInput, InputAudioConfig, \
     SentimentAnalysisRequestConfig, StreamingDetectIntentRequest, TextInput
 from dialogflow_ros.msg import *
 from output import print_context_parameters
-
+from google.protobuf.struct_pb2 import ListValue
 
 def parameters_struct_to_msg(parameters):
     """Convert Dialogflow parameter (Google Struct) into ros msg
@@ -19,7 +19,12 @@ def parameters_struct_to_msg(parameters):
     if parameters.items():
         param_list = []
         for name, value in parameters.items():
-            param = DialogflowParameter(param_name=str(name), value=[str(value)])
+            if type(value) is ListValue:
+                param = DialogflowParameter(param_name=name, value=[value])
+            else:
+                value_utf8 = value.encode('utf-8')
+                name_utf8 = name.encode('utf-8')
+                param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
             param_list.append(param)
         return param_list
     else:

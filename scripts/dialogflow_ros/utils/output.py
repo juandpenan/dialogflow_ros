@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from google.protobuf.struct_pb2 import ListValue
+
 def print_context_parameters(contexts):
     result = []
     for context in contexts:
@@ -7,9 +9,13 @@ def print_context_parameters(contexts):
         temp_str = '\n\t'
         #context = context.encode('utf-8')
         for parameter in context.parameters:
-            parameter = parameter.encode('utf-8')
-            param_list.append("{}: {}".format(
+            if type(context.parameters[parameter]) is ListValue:
+                param_list.append("{}: {}".format(
                     parameter, context.parameters[parameter]))
+            else:
+                parameter = parameter.encode('utf-8')
+                param_list.append("{}: {}".format(
+                    parameter, context.parameters[parameter].encode('utf-8')))
         temp_str += "Name: {}\n\tParameters:\n\t {}".format(
                 context.name.split('/')[-1], "\n\t".join(param_list))
         result.append(temp_str)
@@ -23,7 +29,7 @@ def print_parameters(parameters):
     for parameter in parameters:
         parameter = parameter.encode('utf-8')
         param_list.append("{}: {}\n\t".format(
-                parameter, parameters[parameter]))
+                parameter, parameters[parameter].encode('utf-8')))
         temp_str += "{}".format("\n\t".join(param_list))
         return temp_str
 
