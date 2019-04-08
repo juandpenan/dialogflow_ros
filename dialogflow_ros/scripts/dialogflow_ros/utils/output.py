@@ -28,8 +28,12 @@ def print_parameters(parameters):
     temp_str = '\n\t'
     for parameter in parameters:
         parameter = parameter.encode('utf-8')
-        param_list.append("{}: {}\n\t".format(
-                parameter, parameters[parameter].encode('utf-8')))
+        if type(parameters[parameter]) is ListValue:
+            param_list.append("{}: {}\n\t".format(
+                    parameter, parameters[parameter]))
+        else:
+            param_list.append("{}: {}\n\t".format(
+                    parameter, parameters[parameter].encode('utf-8')))
         temp_str += "{}".format("\n\t".join(param_list))
         return temp_str
 
