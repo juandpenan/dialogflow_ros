@@ -19,11 +19,27 @@ def parameters_struct_to_msg(parameters):
     if parameters.items():
         param_list = []
         for name, value in parameters.items():
+            name_utf8 = name.encode('utf-8')
+            #print("[param_to_msg] " + name_utf8)
             if type(value) is ListValue:
-                param = DialogflowParameter(param_name=name, value=[value])
+                values_utf8 = []
+                for v in value:
+                    if (v != ""):
+                        values_utf8.append(v.encode('utf-8'))
+                if (len(values_utf8) != 0):
+                    #print("111111111111111111")
+                    param = DialogflowParameter(param_name=name_utf8, value=[values_utf8])
+
+                    #print(values_utf8)
+                else:
+                    #print("22222222222222222222")
+                    #print(name_utf8)
+                    param = DialogflowParameter(param_name=name_utf8, value=[])
+
             else:
+                #print("333333333333")
                 value_utf8 = value.encode('utf-8')
-                name_utf8 = name.encode('utf-8')
+                #print("[param_to_msg] " + value_utf8)
                 param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
             param_list.append(param)
         return param_list

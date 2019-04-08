@@ -317,7 +317,9 @@ class DialogflowClient(object):
                     final_result.output_contexts
             )
             df_msg = utils.converters.result_struct_to_msg(final_result)
+
             rospy.loginfo(utils.output.print_result(final_result))
+            print ("----------------------------")
             # Play audio
             if self.PLAY_AUDIO:
                 self._play_stream(final_audio.output_audio)
