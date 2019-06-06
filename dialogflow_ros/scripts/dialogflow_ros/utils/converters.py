@@ -7,7 +7,7 @@ from dialogflow_v2beta1.types import Context, EventInput, InputAudioConfig, \
     SentimentAnalysisRequestConfig, StreamingDetectIntentRequest, TextInput
 from dialogflow_ros_msgs.msg import *
 from output import print_context_parameters
-from google.protobuf.struct_pb2 import ListValue
+from google.protobuf.struct_pb2 import ListValue, Struct
 
 def parameters_struct_to_msg(parameters):
     """Convert Dialogflow parameter (Google Struct) into ros msg
@@ -20,26 +20,22 @@ def parameters_struct_to_msg(parameters):
         param_list = []
         for name, value in parameters.items():
             name_utf8 = name.encode('utf-8')
-            #print("[param_to_msg] " + name_utf8)
             if type(value) is ListValue:
                 values_utf8 = []
                 for v in value:
                     if (v != ""):
                         values_utf8.append(v.encode('utf-8'))
                 if (len(values_utf8) != 0):
-                    #print("111111111111111111")
                     param = DialogflowParameter(param_name=name_utf8, value=[values_utf8])
-
-                    #print(values_utf8)
                 else:
-                    #print("22222222222222222222")
-                    #print(name_utf8)
                     param = DialogflowParameter(param_name=name_utf8, value=[])
-
+            elif type(value) is Struct:
+                for v in value:
+                    if value[v] != "":
+                        value_utf8 = value[v].encode('utf-8')
+                        param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
             else:
-                #print("333333333333")
                 value_utf8 = value.encode('utf-8')
-                #print("[param_to_msg] " + value_utf8)
                 param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
             param_list.append(param)
         return param_list
@@ -88,7 +84,8 @@ def contexts_struct_to_msg(contexts):
         df_context_msg = DialogflowContext()
         df_context_msg.name = str(context.name)
         df_context_msg.lifespan_count = int(context.lifespan_count)
-        df_context_msg.parameters = parameters_struct_to_msg(context.parameters)
+        # Temporal fix to field contexts[].parameters[].value[] must be of type str
+        #df_context_msg.parameters = parameters_struct_to_msg(context.parameters)
         context_list.append(df_context_msg)
     return context_list
 

@@ -3,7 +3,7 @@ from six.moves import queue
 
 # Audio recording parameters
 RATE = 16000
-CHUNK = 1600
+CHUNK = 1024
 
 
 class MicrophoneStream(object):

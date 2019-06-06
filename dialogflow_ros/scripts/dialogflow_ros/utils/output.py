@@ -7,7 +7,6 @@ def print_context_parameters(contexts):
     for context in contexts:
         param_list = []
         temp_str = '\n\t'
-        #context = context.encode('utf-8')
         for parameter in context.parameters:
             if type(context.parameters[parameter]) is ListValue:
                 param_list.append("{}: {}".format(

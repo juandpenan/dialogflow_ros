@@ -3,7 +3,7 @@
 import rospy
 from dialogflow_ros import DialogflowClient
 from dialogflow_ros_msgs.msg import *
-from dialogflow_v2beta1.types import EventInput, QueryInput
+from dialogflow.types import EventInput, QueryInput
 from google.protobuf import struct_pb2
 import datetime
 

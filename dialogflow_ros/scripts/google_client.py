@@ -13,7 +13,6 @@ import signal
 import yaml
 from std_msgs.msg import String
 
-
 class GspeechClient:
     def __init__(self):
         # Audio stream input setup

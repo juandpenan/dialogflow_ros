@@ -101,7 +101,7 @@ class DialogflowClient(object):
         #rospy.Subscriber(event_req_topic, DialogflowEvent, self._event_request_cb)
 
         self._results_pub = rospy.Publisher(results_topic, DialogflowResult,
-                                            queue_size=10)
+                                            queue_size=1)
         text_req_topic = requests_topic + '/string_msg'
         rospy.Subscriber(text_req_topic, String, self._text_request_cb)
         start_srv_ = rospy.Service('/dialogflow_client/start', Empty, self.start_dialog_cb)
@@ -119,7 +119,6 @@ class DialogflowClient(object):
 
         rospy.logdebug("DF_CLIENT: Last Contexts: {}".format(self.last_contexts))
         rospy.loginfo("DF_CLIENT: Ready!")
-
 
     # ========================================= #
     #           ROS Utility Functions           #
@@ -154,7 +153,7 @@ class DialogflowClient(object):
         self.event_intent(new_event)
 
     def start_dialog_cb(self,req):
-        rospy.loginfo("[dialogflow_client] Start cb")
+        rospy.logdebug("[dialogflow_client] Start cb")
         self.detect_intent_stream()
         return []
 
@@ -272,11 +271,11 @@ class DialogflowClient(object):
             )
             df_msg = utils.converters.result_struct_to_msg(
                     response.query_result)
+            self._results_pub.publish(df_msg)
             rospy.loginfo(utils.output.print_result(response.query_result))
             # Play audio
             if self.PLAY_AUDIO:
                 self._play_stream(response.output_audio)
-            self._results_pub.publish(df_msg)
             return df_msg
 
     def detect_intent_stream(self, return_result=False):
@@ -317,14 +316,13 @@ class DialogflowClient(object):
                     final_result.output_contexts
             )
             df_msg = utils.converters.result_struct_to_msg(final_result)
+            # Pub
+            self._results_pub.publish(df_msg)
 
             rospy.loginfo(utils.output.print_result(final_result))
-            print ("----------------------------")
             # Play audio
             if self.PLAY_AUDIO:
                 self._play_stream(final_audio.output_audio)
-            # Pub
-            self._results_pub.publish(df_msg)
             if return_result: return df_msg, final_result
             self._responses = []
             return df_msg
