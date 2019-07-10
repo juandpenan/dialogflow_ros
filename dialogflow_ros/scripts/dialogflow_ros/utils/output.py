@@ -27,7 +27,7 @@ def print_parameters(parameters):
     temp_str = '\n\t'
     for parameter in parameters:
         parameter = parameter.encode('utf-8')
-        if type(parameters[parameter]) is ListValue:
+        if type(parameters[parameter]) is ListValue or type(parameters[parameter]) is float:
             param_list.append("{}: {}\n\t".format(
                     parameter, parameters[parameter]))
         else:

@@ -35,8 +35,12 @@ def parameters_struct_to_msg(parameters):
                         value_utf8 = value[v].encode('utf-8')
                         param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
             else:
-                value_utf8 = value.encode('utf-8')
-                param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
+                if type(value) is float:
+                    value_str = str(int(value))
+                    param = DialogflowParameter(param_name=name_utf8, value=[value_str])
+                else:
+                    value_utf8 = value.encode('utf-8')
+                    param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
             param_list.append(param)
         return param_list
     else:
