@@ -17,8 +17,8 @@ Install all the requirements using pip by cloning the Github repo and installing
 
 ```bash
 cd ~/catkin_ws/src
-git clone https://github.com/piraka9011/dialogflow_ros.git
-cd dialogflow_ros
+git clone https://github.com/jginesclavero/dialogflow_ros
+cd dialogflow_ros/dialogflow_ros
 pip install -r requirements.txt
 ```
 
