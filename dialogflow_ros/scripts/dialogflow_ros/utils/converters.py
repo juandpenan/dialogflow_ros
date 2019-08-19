@@ -26,7 +26,7 @@ def parameters_struct_to_msg(parameters):
                     if (v != ""):
                         values_utf8.append(v.encode('utf-8'))
                 if (len(values_utf8) != 0):
-                    param = DialogflowParameter(param_name=name_utf8, value=[values_utf8])
+                    param = DialogflowParameter(param_name=name_utf8, value=values_utf8)
                 else:
                     param = DialogflowParameter(param_name=name_utf8, value=[])
             elif type(value) is Struct:
