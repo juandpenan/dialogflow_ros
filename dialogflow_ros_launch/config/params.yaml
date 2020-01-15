@@ -1,0 +1,9 @@
+dialogflow_client:
+  ros__parameters:
+    results_topic: "/dialogflow_client/results"
+    requests_topic: "/dialogflow_client/requests"
+    start_srv: "/dialogflow_client/start"
+    project_id: "acciona-pepper"
+    play_audio: false
+    debug: false
+    default_language: "es-ES"

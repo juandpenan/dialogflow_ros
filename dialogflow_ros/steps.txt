@@ -1,0 +1,3 @@
+Instalar dialogflow
+  sudo pip3 install dialogflow
+Exportar la var de entorno GOOGLE_APPLICATION_CREDENTIALS

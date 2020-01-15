@@ -1,32 +1,30 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
+
 project(dialogflow_ros_msgs)
 
-find_package(catkin REQUIRED COMPONENTS
-  std_msgs
-  message_generation
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(ament_cmake REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/DialogflowContext.msg"
+  "msg/DialogflowEvent.msg"
+  "msg/DialogflowParameter.msg"
+  "msg/DialogflowRequest.msg"
+  "msg/DialogflowResult.msg"
+  "srv/DialogflowService.srv"
+  DEPENDENCIES builtin_interfaces
 )
 
-add_service_files(
-  FILES
-  DialogflowService.srv
-)
+ament_export_dependencies(rosidl_default_runtime)
 
-add_message_files(
-  FILES
-  DialogflowResult.msg
-  DialogflowContext.msg
-  DialogflowParameter.msg
-  DialogflowRequest.msg
-  DialogflowEvent.msg
-)
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-)
-
-catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES dialogflow_ros_msgs
-   CATKIN_DEPENDS message_runtime
-#  DEPENDS system_lib
-)
+ament_package()
