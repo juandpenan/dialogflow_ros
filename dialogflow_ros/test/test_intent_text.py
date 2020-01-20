@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+#
+# colcon test --packages-select <YOUR_PACKAGE> --event-handlers console_direct+
+#
 import rclpy
 from dialogflow_ros import utils
 from dialogflow_ros.dialogflow_client import DialogflowClient

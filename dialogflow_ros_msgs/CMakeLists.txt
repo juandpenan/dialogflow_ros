@@ -22,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DialogflowRequest.msg"
   "msg/DialogflowResult.msg"
   "srv/DialogflowService.srv"
+  "action/Listen.action"
   DEPENDENCIES builtin_interfaces
 )
 

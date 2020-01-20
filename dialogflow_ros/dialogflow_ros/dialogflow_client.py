@@ -31,16 +31,20 @@ import os
 import time
 from uuid import uuid4
 from yaml import load, YAMLError
+import threading
 # ROS2
 import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rcl_interfaces.msg import ParameterDescriptor
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from std_msgs.msg import String
 from std_srvs.srv import Empty
 
 from dialogflow_ros_msgs.msg import DialogflowRequest, DialogflowResult
-
+from dialogflow_ros_msgs.action import Listen
 
 class DialogflowClient(Node):
   def __init__(self, last_contexts=None):
@@ -56,7 +60,7 @@ class DialogflowClient(Node):
       ('debug', '', ParameterDescriptor()),
       ('default_language', 'en-US', ParameterDescriptor()),
       ('results_topic', '/dialogflow_client/results', ParameterDescriptor()),
-      ('requests_topic', '', ParameterDescriptor()),
+      ('requests_topic', '/dialogflow_client/requests', ParameterDescriptor()),
       ('context_file', '', ParameterDescriptor())
     ]
 
@@ -70,7 +74,7 @@ class DialogflowClient(Node):
     results_topic = self.get_parameter_or('results_topic', 
       Parameter('results_topic', type_ = Parameter.Type.STRING, value = ""))._value
     requests_topic = self.get_parameter_or('requests_topic', 
-      Parameter('requests_topic', type_ = Parameter.Type.STRING, value = "/dialogflow_client/requests"))._value
+      Parameter('requests_topic', type_ = Parameter.Type.STRING, value = ""))._value
     context_file = self.get_parameter_or('context_file', 
       Parameter('context_file', type_ = Parameter.Type.STRING, value = ''))._value
 
@@ -113,25 +117,40 @@ class DialogflowClient(Node):
     self._results_pub = self.create_publisher(DialogflowResult, results_topic, 1)
     text_req_topic = requests_topic + '/string_msg'
     
-    self._text_req_sub = self.create_subscription(String, text_req_topic, self._text_request_cb, 10)
-    self._start_srv = self.create_service(Empty, '/dialogflow_client/start', self._start_dialog_cb)
-    self._stop_srv = self.create_service(Empty, '/dialogflow_client/stop', self._stop_dialog_cb)
+    self._text_req_sub = self.create_subscription(String, text_req_topic, self.text_request_cb, 10)
+    self._stop_srv = self.create_service(Empty, '/dialogflow_client/stop', self.stop_dialog_cb)
 
     """ Audio setup """
     # Mic stream input setup
     self.audio = pyaudio.PyAudio()
 
     if self.PLAY_AUDIO:
-      self._create_audio_output()
+      self.create_audio_output()
+    
+    self._goal_handle = None
+    self._goal_lock = threading.Lock()
+    self._action_server = ActionServer(
+      self,
+      Listen,
+      'dialogflow_client/listen',
+      execute_callback=self.execute_callback,
+      goal_callback=self.goal_callback,
+      handle_accepted_callback=self.handle_accepted_callback,
+      cancel_callback=self.cancel_callback,
+      callback_group=ReentrantCallbackGroup()
+    )
 
     self.get_logger().debug("DF_CLIENT: Last Contexts: %s" % format(self.last_contexts))
     self.get_logger().info("DF_CLIENT: Ready!")
 
+  def destroy(self):
+    self._action_server.destroy()
+    super().destroy_node()
   # ========================================= #
   #           ROS Utility Functions           #
   # ========================================= #
 
-  def _text_request_cb(self, msg):
+  def text_request_cb(self, msg):
     """ROS Callback that sends text received from a topic to Dialogflow.
 
     :param msg: A String message.
@@ -139,23 +158,50 @@ class DialogflowClient(Node):
     """
     self.get_logger().debug("DF_CLIENT: Request received")
     new_msg = DialogflowRequest(query_text = msg.data)
-    df_msg = self._detect_intent_text(new_msg)
+    df_msg = self.detect_intent_text(new_msg)
   
-  def _start_dialog_cb(self, req, res):
-    self.get_logger().debug("DF_CLIENT: Start service...")
-    self._detect_intent_stream()
-    return res
-
-  def _stop_dialog_cb(self, req, res):
+  def stop_dialog_cb(self, req, res):
     Self.get_logger().debug("DF_CLIENT: Stop service...")
     self._responses.cancel()
     return res
+
+  def goal_callback(self, goal_request):
+    """Accepts or rejects a client request to begin an action."""
+    self.get_logger().info('Received listen goal request')
+    return GoalResponse.ACCEPT
+
+  def handle_accepted_callback(self, goal_handle):
+    with self._goal_lock:
+      # This server only allows one goal at a time
+      if self._goal_handle is not None and self._goal_handle.is_active:
+        self.get_logger().warn('Aborting previous goal')
+        # Abort the existing goal
+        self._goal_handle.abort()
+      self._goal_handle = goal_handle
+
+    self.get_logger().info('Goal accepted')
+    goal_handle.execute()
+
+  def cancel_callback(self, goal):
+    """Accepts or rejects a client request to cancel an action."""
+    self.get_logger().info('Received cancel request')
+    return CancelResponse.ACCEPT
+
+  def execute_callback(self, goal_handle):
+    """Executes the goal."""
+    self.get_logger().info('Listening...')
+    result = Listen.Result()
+    # Populate result message
+    result.result = self.detect_intent_stream()
+    goal_handle.succeed()
+    self.get_logger().info('Returning result')
+    return result
 
   # ----------------- #
   #  Audio Utilities  #
   # ----------------- #
 
-  def _create_audio_output(self):
+  def create_audio_output(self):
     """Create a PyAudio output stream."""
     self.get_logger().debug("DF_CLIENT: Creating audio output...")
     self.stream_out = self.audio.open(
@@ -164,7 +210,7 @@ class DialogflowClient(Node):
       rate=24000,
       output=True)
 
-  def _play_stream(self, data):
+  def play_stream(self, data):
     """Plays the output Dialogflow response.
 
     :param data: Audio in bytes.
@@ -178,7 +224,7 @@ class DialogflowClient(Node):
   #  DF Utilities  #
   # -------------- #
 
-  def _generator(self):
+  def generator(self):
     """Generates yields audio chunks from the buffer.
     Used to stream data to the Google Speech API Asynchronously.
 
@@ -188,12 +234,9 @@ class DialogflowClient(Node):
     """
     # First message contains session, query_input, and params
     query_input = QueryInput(audio_config=self._audio_config)
-    contexts = utils.converters.contexts_msg_to_struct(self.last_contexts)
-    params = QueryParameters(contexts=contexts)
     req = StreamingDetectIntentRequest(
       session=self._session,
       query_input=query_input,
-      query_params=params,
       single_utterance=True,
       output_audio_config=self._output_audio_config
     )
@@ -208,7 +251,7 @@ class DialogflowClient(Node):
   #           Dialogflow Functions           #
   # ======================================== #
 
-  def _detect_intent_text(self, msg):
+  def detect_intent_text(self, msg):
     """Use the Dialogflow API to detect a user's intent. Goto the Dialogflow
     console to define intents and params.
 
@@ -235,19 +278,19 @@ class DialogflowClient(Node):
       )
       df_msg = utils.converters.result_struct_to_msg(
         response.query_result)
-      self.get_logger().warn("DF_CLIENT: Response from DF received. Publishing...")
+      self.get_logger().info("DF_CLIENT: Response from DF received. Publishing...")
       self._results_pub.publish(df_msg)
-      #self.get_logger().debug(utils.output.print_result(response.query_result))
+      self.get_logger().debug(utils.output.print_result(df_msg))
       # Play audio
       if self.PLAY_AUDIO:
-        self._play_stream(response.output_audio)
+        self.play_stream(response.output_audio)
       return df_msg
 
-  def _detect_intent_stream(self, return_result=False):
+  def detect_intent_stream(self, return_result=False):
     """Gets data from an audio generator (mic) and streams it to Dialogflow.
     We use a stream for VAD and single utterance detection."""
     # Generator yields audio chunks.
-    requests = self._generator()
+    requests = self.generator()
     try:
       self._responses = self._session_cli.streaming_detect_intent(requests)
       resp_list = []
@@ -257,7 +300,7 @@ class DialogflowClient(Node):
           'DF_CLIENT: Intermediate transcript: "%s".' % 
           format(response.recognition_result.transcript.encode('utf-8'))
         )
-        self.get_logger().warn("DF_CLIENT: Reading from mic...")
+        self.get_logger().info("DF_CLIENT: Reading from mic...")
     except google.api_core.exceptions.Cancelled as c:
       self.get_logger().warn("DF_CLIENT - detect_intent_stream: Caught a Google API Client cancelled "
         "exception. Check request format!:\n %s" % format(c))
@@ -284,10 +327,10 @@ class DialogflowClient(Node):
       df_msg = utils.converters.result_struct_to_msg(final_result)
       # Pub
       self._results_pub.publish(df_msg)
-      self.get_logger().info(utils.output.print_result(final_result))
+      self.get_logger().info(utils.output.print_result(df_msg))
       # Play audio
       if self.PLAY_AUDIO:
-        self._play_stream(final_audio.output_audio)
+        self.play_stream(final_audio.output_audio)
       if return_result: return df_msg, final_result
       self._responses = []
       return df_msg
@@ -301,11 +344,12 @@ def main(args=None):
   node = DialogflowClient()
   try:
     node.start()
-    rclpy.spin(node)
+    executor = MultiThreadedExecutor()
+    rclpy.spin(node, executor=executor)
   except KeyboardInterrupt:
     pass
 
-  node.destroy_node()
+  node.destroy()
   rclpy.shutdown()
 
 if __name__ == '__main__':
