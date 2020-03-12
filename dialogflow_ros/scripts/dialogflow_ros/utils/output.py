@@ -14,7 +14,7 @@ def print_context_parameters(contexts):
             else:
                 parameter = parameter.encode('utf-8')
                 param_list.append("{}: {}".format(
-                    parameter, context.parameters[parameter].encode('utf-8')))
+                    parameter, context.parameters[parameter]))
         temp_str += "Name: {}\n\tParameters:\n\t {}".format(
                 context.name.split('/')[-1], "\n\t".join(param_list))
         result.append(temp_str)
