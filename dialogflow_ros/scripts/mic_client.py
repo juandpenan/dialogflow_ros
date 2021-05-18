@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types

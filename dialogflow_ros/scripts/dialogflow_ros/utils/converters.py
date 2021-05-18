@@ -1,12 +1,11 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import rospy
 from google.protobuf import struct_pb2
-from dialogflow_v2beta1.types import Context, EventInput, InputAudioConfig, \
+from dialogflow_v2.types import Context, EventInput, InputAudioConfig, \
     OutputAudioConfig, QueryInput, QueryParameters, \
     SentimentAnalysisRequestConfig, StreamingDetectIntentRequest, TextInput
 from dialogflow_ros_msgs.msg import *
-from output import print_context_parameters
+from .output import print_context_parameters
 from google.protobuf.struct_pb2 import ListValue, Struct
 
 def parameters_struct_to_msg(parameters):
@@ -19,12 +18,12 @@ def parameters_struct_to_msg(parameters):
     if parameters.items():
         param_list = []
         for name, value in parameters.items():
-            name_utf8 = name.encode('utf-8')
+            name_utf8 = name
             if type(value) is ListValue:
                 values_utf8 = []
                 for v in value:
                     if (v != ""):
-                        values_utf8.append(v.encode('utf-8'))
+                        values_utf8.append(v)
                 if (len(values_utf8) != 0):
                     param = DialogflowParameter(param_name=name_utf8, value=values_utf8)
                 else:
@@ -32,14 +31,14 @@ def parameters_struct_to_msg(parameters):
             elif type(value) is Struct:
                 for v in value:
                     if value[v] != "":
-                        value_utf8 = value[v].encode('utf-8')
+                        value_utf8 = value[v]
                         param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
             else:
                 if type(value) is float:
                     value_str = str(int(value))
                     param = DialogflowParameter(param_name=name_utf8, value=[value_str])
                 else:
-                    value_utf8 = value.encode('utf-8')
+                    value_utf8 = value
                     param = DialogflowParameter(param_name=name_utf8, value=[value_utf8])
             param_list.append(param)
         return param_list
@@ -137,9 +136,9 @@ def result_struct_to_msg(query_result):
         :rtype: DialogflowResult
         """
         df_result_msg = DialogflowResult()
-        df_result_msg.fulfillment_text = query_result.fulfillment_text.encode('utf-8')
-        df_result_msg.query_text = query_result.query_text.encode('utf-8')
-        df_result_msg.action = query_result.action.encode('utf-8')
+        df_result_msg.fulfillment_text = query_result.fulfillment_text
+        df_result_msg.query_text = query_result.query_text
+        df_result_msg.action = query_result.action
         df_result_msg.parameters = parameters_struct_to_msg(
                 query_result.parameters
         )

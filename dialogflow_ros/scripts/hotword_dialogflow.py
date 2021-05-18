@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # Snowboy
 from snowboy import snowboydecoder
 # Dialogflow

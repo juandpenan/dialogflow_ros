@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from google.protobuf.struct_pb2 import ListValue
 
