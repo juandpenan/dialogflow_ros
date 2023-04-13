@@ -11,6 +11,7 @@ import pyaudio
 import signal
 import time
 import wave
+import os
 
 
 class HotwordDialogflow(Node):
@@ -18,11 +19,11 @@ class HotwordDialogflow(Node):
         super().__init__('hotword')
         self.interrupted = False
         self.detector = None
-        rpack = RosPack()
+
         # UMDL or PMDL file paths along with audio files
-        pkg_path = rpack.get_path('dialogflow_ros')
-        self.model_path = pkg_path + '/scripts/snowboy/resources/jarvis.umdl'
-        ding_path = pkg_path + '/scripts/snowboy/resources/ding.wav'
+        pkg_path = get_package_share_directory('dialogflow_ros2')
+        self.model_path = os.path.join(pkg_path,'jarvis.umdl')
+        ding_path = os.path.join(pkg_path, 'ding.wav')
         # Setup df
         self.df_client = None
         # Setup audio output
