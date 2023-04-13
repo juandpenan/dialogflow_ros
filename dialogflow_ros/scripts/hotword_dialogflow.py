@@ -5,7 +5,7 @@ from dialogflow_ros import DialogflowClient
 # ROS
 import rclpy
 from rclpy import Node
-from rospkg.rospack import RosPack
+from ament_index_python.packages import get_package_share_directory
 # Python
 import pyaudio
 import signal
