@@ -3,7 +3,8 @@ from snowboy import snowboydecoder
 # Dialogflow
 from dialogflow_ros import DialogflowClient
 # ROS
-import rospy
+import rclpy
+from rclpy import Node
 from rospkg.rospack import RosPack
 # Python
 import pyaudio
@@ -12,8 +13,9 @@ import time
 import wave
 
 
-class HotwordDialogflow(object):
+class HotwordDialogflow(Node):
     def __init__(self):
+        super().__init__('hotword')
         self.interrupted = False
         self.detector = None
         rpack = RosPack()
@@ -32,10 +34,10 @@ class HotwordDialogflow(object):
                 channels=ding.getnchannels(), rate=ding.getframerate(),
                 input=False, output=True)
         self.last_contexts = []
-        rospy.loginfo("HOTWORD_CLIENT: Ready!")
+        self.get_logger().info("HOTWORD_CLIENT: Ready!")
 
     def _signal_handler(self, signal, frame):
-        rospy.logwarn("SIGINT Caught!")
+        self.get_logger().warning("SIGINT Caught!")
         self.exit()
 
     def _interrupt_callback(self):
@@ -49,7 +51,7 @@ class HotwordDialogflow(object):
         self.stream_out.stop_stream()
 
     def _df_callback(self):
-        rospy.loginfo("HOTWORD_CLIENT: Hotword detected!")
+        self.get_logger().info("HOTWORD_CLIENT: Hotword detected!")
         self.play_ding()
         # self.df_client = DialogflowClient(last_contexts=self.last_contexts)
         df_msg, res = self.df_client.detect_intent_stream(return_result=True)
@@ -62,7 +64,7 @@ class HotwordDialogflow(object):
         self.detector = snowboydecoder.HotwordDetector(self.model_path,
                                                        sensitivity=[0.5, 0.5])
         self.df_client = DialogflowClient()
-        rospy.loginfo("HOTWORD_CLIENT: Listening... Press Ctrl-C to stop.")
+        self.get_logger().info("HOTWORD_CLIENT: Listening... Press Ctrl-C to stop.")
         while True:
             try:
                 self.detector.start(detected_callback=self._df_callback,
@@ -79,8 +81,11 @@ class HotwordDialogflow(object):
         self.detector.terminate()
         exit()
 
+def main(args=None):
+    rclpy.init(args=args)
+    node = HotwordDialogflow()
+    node.start()
+    rclpy.spin(node)
 
 if __name__ == '__main__':
-    rospy.init_node('hotword_client', log_level=rospy.DEBUG)
-    hd = HotwordDialogflow()
-    hd.start()
+    main()
