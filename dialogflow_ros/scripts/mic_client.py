@@ -2,13 +2,15 @@ from google.cloud import speech
 from google.cloud.speech import enums
 from google.cloud.speech import types
 import pyaudio
-import Queue
-import rospy
+import queue
+import rclpy
+from rclpy import Node
 from std_msgs.msg import String
 
 
-class GspeechClient(object):
+class GspeechClient(Node):
     def __init__(self):
+        super().__init__('dialogflow_mic_client')
         # Audio stream input setup
         FORMAT = pyaudio.paInt16
         CHANNELS = 1
@@ -19,12 +21,13 @@ class GspeechClient(object):
                                       rate=RATE, input=True,
                                       frames_per_buffer=self.CHUNK,
                                       stream_callback=self._get_data)
-        self._buff = Queue.Queue()  # Buffer to hold audio data
+        self._buff = queue.Queue()  # Buffer to hold audio data
         self.closed = False
 
         # ROS Text Publisher
-        text_topic = rospy.get_param('/text_topic', '/dialogflow_text')
-        self.text_pub = rospy.Publisher(text_topic, String, queue_size=10)
+        self.declare_parameter('text_topic', 'dialogflow_text')
+        text_topic = self.get_parameter('text_topic').get_parameter_value().string_value
+        self.text_pub = self.create_publisher(String, text_topic, 10)
 
     def _get_data(self, in_data, frame_count, time_info, status):
         """Daemon thread to continuously get audio data from the server and put
@@ -52,7 +55,7 @@ class GspeechClient(object):
                     if chunk is None:
                         return
                     data.append(chunk)
-                except Queue.Empty:
+                except queue.Queue.empty:
                     break
 
             yield b''.join(data)
@@ -82,7 +85,7 @@ class GspeechClient(object):
 
             # Parse the final utterance
             if result.is_final:
-                rospy.loginfo("Google Speech result: {}".format(result))
+                self.get_logger().info(f'Google Speech result: {format(result)}')
                 # Received data is Unicode, convert it to string
                 transcript = transcript.encode('utf-8')
                 # Strip the initial space, if any
@@ -92,7 +95,9 @@ class GspeechClient(object):
                 if transcript.lower() == 'exit':
                     self.shutdown()
                 # Send the rest of the sentence to topic
-                self.text_pub.publish(transcript)
+                msg = String()
+                msg.data = transcript
+                self.text_pub.publish(msg)
 
     def gspeech_client(self):
         """Creates the Google Speech API client, configures it, and sends/gets
@@ -114,7 +119,7 @@ class GspeechClient(object):
 
     def shutdown(self):
         """Shut down as cleanly as possible"""
-        rospy.loginfo("Shutting down")
+        self.get_logger().info("Shutting down")
         self.closed = True
         self._buff.put(None)
         self.stream.close()
@@ -124,14 +129,19 @@ class GspeechClient(object):
     def start_client(self):
         """Entry function to start the client"""
         try:
-            rospy.loginfo("Starting Google speech mic client")
+            self.get_logger().info("Starting Google speech mic client")
             self.gspeech_client()
         except KeyboardInterrupt:
             self.shutdown()
 
+def main(args=None):
+    rclpy.init(args=args)
+    node = GspeechClient()
+    node.start_client()
+    rclpy.spin(node)
+
 
 if __name__ == '__main__':
-    rospy.init_node('dialogflow_mic_client')
-    g = GspeechClient()
-    g.start_client()
+    main()
+
 
